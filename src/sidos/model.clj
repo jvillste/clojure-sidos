@@ -2,9 +2,6 @@
 
 ;;--------------- Modelling DSL
 
-(defmacro dsl-keyword [name & keys]
-  `(defn ~name [& values#] (assoc (zipmap [~@keys] values# ) :definition-type ~(keyword name))))
-
 (defn filter-by-definition-type [type definitions]
   (filter #(= (:definition-type %1) type) definitions))
 
@@ -25,8 +22,10 @@
                                 (assoc result :collection-type :single)
                                 result)))
 
+(defmacro dsl-keyword [name & keys]
+  `(defn ~name [& values#] (assoc (zipmap [~@keys] values# ) :definition-type ~(keyword name))))
+
 (dsl-keyword s-alias :namespace-name :short-name)
-;(dsl-keyword s-property :name :range :collection-type)
 (dsl-keyword >> :namespace :type)
 
 
@@ -66,13 +65,17 @@
                                                           :collection-type (:collection-type property))))))))))
 
 
-;;--------------- Misc
+;;--------------- Printing
+
+(defn full-name [type-reference]
+  (str (name (:namespace type-reference)) "." (name (:name type-reference))))
 
 (defn print-type [type]
   (do (println (str (name (:namespace type)) "." (name (:name type))))
       (doseq [property (:properties type)]
         (println (str "  " (name (:name property))
-                      " : " (str (name (:namespace (:range property) )) "." (name (:name (:range property))) " " (name (:collection-type property)) ))))))
+                      " : " (full-name (:range property))
+                      " " (name (:collection-type property)))))))
 
 (defn print-model [model]
   (doseq [type model] (print-type type)))

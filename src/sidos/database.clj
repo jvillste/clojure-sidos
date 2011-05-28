@@ -1,6 +1,7 @@
 (ns sidos.database
   (:use org.bituf.clj-dbcp)
-  (:use [clojure.contrib.sql :as sql :only ()]))
+  (:use [clojure.contrib.sql :as sql :only ()])
+  (:require sidos.model))
 
 (def db-h2 (db-spec (h2-memory-datasource))) ; creates in-memory instance
 
@@ -27,3 +28,23 @@
       ;; drop table
       ;;     (drop-table)
       )))
+
+(defn type-table-definition [type]
+  (str "create table " (sidos.model/full-name type)
+       " ( "
+       (apply str (interpose ", " (map property-column
+                                             (filter #(= (:collection-type %) :single)
+                                                     (:properties type)))))
+       " ) "))
+
+(defn property-column [property]
+  (str (name (:name property)) " " (sql-type (:range property))))
+
+(defn sql-type [{:keys [name namespace]}]
+  (if (= namespace :org.sidos.primitive)
+    (cond (= name :string) "varchar(50)"
+          (= name :integer) "int"
+          (= name :time) "timestamp"
+          (= name :boolean) "boolean"
+          :default nil)
+    "uuid"))
