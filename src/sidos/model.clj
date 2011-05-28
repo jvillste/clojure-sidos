@@ -1,46 +1,6 @@
-(ns sidos.core
-  (:use org.bituf.clj-dbcp)
-  (:use [clojure.contrib.sql :as sql :only ()]))
+(ns sidos.model)
 
-
-(def db-h2 (db-spec (h2-memory-datasource))) ; creates in-memory instance
-
-(defn crud
-  []
-  (let [table :emp
-        orig-record {:id 1 :name "Bashir" :age 40}
-        updt-record {:id 1 :name "Shabir" :age 50}
-        drop-table  #(sql/do-commands "DROP TABLE emp")
-        retrieve-fn #(sql/with-query-results rows
-                       ["SELECT * FROM emp WHERE id=?" 1]
-                       (first rows))]
-    (sql/with-connection db-h2
-      ;; drop table if pre-exists
-      ;;      (try (drop-table)  (catch Exception _)) ; ignore exception
-      ;; create table
-      ;;      (sql/do-commands  "CREATE TABLE emp (id INT, name VARCHAR(50), age INT)")
-      ;; insert
-      (sql/insert-values table (keys orig-record) (vals orig-record))
-      ;; retrieve
-      (println (retrieve-fn))
-      ;; update
-      (sql/update-values table ["id=?" 1] updt-record)
-      ;; drop table
-      ;;     (drop-table)
-      )))
-
-
-(def namespaces
-  [[:fi-sirunsivut-person
-    [:person
-     [:name :string]
-     [:nick-names :string :list]]]
-   [:fi-sirunsivut-project
-    [:import [:fi-sirunsivut-person :persons]]
-    [:task
-     [:description :string]
-     [:assigned-to [:persons :person]]]]])
-
+;;--------------- Modelling DSL
 
 (defmacro dsl-keyword [name & keys]
   `(defn ~name [& values#] (assoc (zipmap [~@keys] values# ) :definition-type ~(keyword name))))
@@ -65,16 +25,7 @@
 (dsl-keyword >> :namespace :type)
 
 
-(def model
-  [(namespace :fi-sirunsivut-person
-              (type :person
-                    (property :name :string)
-                    (property :nick-names :string :list)))
-
-   (namespace :fi-sirunsivut-project
-              (type :task
-                    (property :description :string)
-                    (property :assigned-to (>> :fi-sirunsivut-person :person))))])
+;;--------------- Primitive model
 
 (def org-sidos-primitive
   (namespace :org-sidos-primitive
@@ -82,6 +33,9 @@
              (type :integer)
              (type :time)
              (type :boolean)))
+
+
+;;--------------- Model compiler
 
 (defn model-to-namespace-type-map [model] (apply hash-map (mapcat #(vector (:name %) (map :name (:types %))) model)))
 
@@ -106,9 +60,9 @@
                                                                  :namespace (range-specification context))))))))))))
 
 
+;;--------------- Misc
 
-
-
-
-
-
+(defn print-type [type]
+  (do (println (:name type))
+      (doseq [property (:properties type)]
+        (println (str "  " (:name property))))))
