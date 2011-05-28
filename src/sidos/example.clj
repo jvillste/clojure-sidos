@@ -1,12 +1,13 @@
-(ns sidos.example)
+(ns sidos.example
+  (:use sidos.model))
 
 (def model
-  [(namespace :fi-sirunsivut-person
-              (type :person
-                    (property :name :string)
-                    (property :nick-names :string :list)))
+  [(s-namespace :fi.sirunsivut.person
+              (s-type :person
+                    (s-property :name :string)
+                    (s-property :nick-names :string :list)))
 
-   (namespace :fi-sirunsivut-project
-              (type :task
-                    (property :description :string)
-                    (property :assigned-to (>> :fi-sirunsivut-person :person))))])
+   (s-namespace :fi.sirunsivut.project
+              (s-type :task
+                    (s-property :description :string)
+                    (s-property :assigned-to (>> :fi.sirunsivut.person :person))))])
