@@ -61,7 +61,7 @@
 
 
 (dsl-keyword alias :namespace-name :short-name)
-(dsl-keyword property :name :type :collection-type)
+(dsl-keyword property :name :range :collection-type)
 (dsl-keyword >> :namespace :type)
 
 
@@ -83,19 +83,29 @@
              (type :time)
              (type :boolean)))
 
-(defn compile [namespaces]
-  (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
-    (for [namespace namespaces
-          type (:types namespace)
-          property (:properties type)]
-      (let [context (create-context (select-keys namespaces-to-types [(:name namespace) :org-sidos-primitive]))]
-        (vector (:name namespace) context)))))
-
 (defn model-to-namespace-type-map [model] (apply hash-map (mapcat #(vector (:name %) (map :name (:types %))) model)))
 
 (defn create-context [namespaces-to-types] (apply merge-with hash-set (map #(zipmap (% namespaces-to-types)
                                                                                     (repeat %))
                                                                            (keys namespaces-to-types))))
+(defn compile [namespaces]
+  (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
+    (for [namespace namespaces]
+      (let [context (create-context (select-keys namespaces-to-types
+                                                 [(:name namespace) :org-sidos-primitive]))]
+        (for [type (:types namespace)]
+          (hash-map :name (:name type)
+                    :namespace (:name namespace)
+                    :properties (for [property (:properties type)]
+                                  (hash-map :name (:name property)
+                                            :range (let [range-specification (:range property)]
+                                                     (if (:definition-type range-specification)
+                                                       (hash-map :name (:type range-specification)
+                                                                 :namespace (:namespace range-specification)) 
+                                                       (hash-map :name range-specification
+                                                                 :namespace (range-specification context))))))))))))
+
+
 
 
 
