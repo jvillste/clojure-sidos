@@ -29,13 +29,28 @@
       ;;     (drop-table)
       )))
 
+;; (defn create-tables-for-type [db type]
+;;   (sql/with-connection db
+;;     (sql/do-commands (type-table-definition type)
+;;                      (map list-table-definition (filter #(= (:collection-type %) :list)
+;;                                                         (:properties type))))))
+
+(defn create-tables-for-type [db type]
+  (do (println (type-table-definition type))
+      (println (apply str (map (partial list-table-definition type) (filter #(= (:collection-type %) :list)
+                                                                            (:properties type)))))))
+
 (defn type-table-definition [type]
   (str "create table " (sidos.model/full-name type)
        " ( "
        (apply str (interpose ", " (map property-column
-                                             (filter #(= (:collection-type %) :single)
-                                                     (:properties type)))))
+                                       (filter #(= (:collection-type %) :single)
+                                               (:properties type)))))
        " ) "))
+
+(defn list-table-definition [domain property]
+  (str "create table list_" (sidos.model/full-name domain) "_" (name (:name property))
+       " ( subject uuid, value " (sql-type (:range property)) ", index int )"))
 
 (defn property-column [property]
   (str (name (:name property)) " " (sql-type (:range property))))
