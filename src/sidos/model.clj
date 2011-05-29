@@ -71,7 +71,7 @@
   (str (name (:namespace type-reference)) "." (name (:name type-reference))))
 
 (defn print-type [type]
-  (do (println (str (name (:namespace type)) "." (name (:name type))))
+  (do (println (full-name type))
       (doseq [property (:properties type)]
         (println (str "  " (name (:name property))
                       " : " (full-name (:range property))
