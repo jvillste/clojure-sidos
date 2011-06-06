@@ -20,11 +20,18 @@
 
 (def model (sidos.model/compile-model model-source))
 
-(deftest property-column-test
+(defn property-column-test []
   (println (sidos.database/property-column (-> model first :properties first))))
 
-(deftest create-tables-for-type-test
+(defn create-tables-for-type-test []
   (do
     (sidos.database/drop-all db)
     (sidos.database/create-tables-for-type db (-> model first))
     (println (sidos.database/show-tables db))))
+
+
+(defn create-tables-for-type-test []
+  (do
+    (sidos.database/drop-all db)
+    (sidos.database/create-tables-for-type db (-> model first))
+    (println (sidos.database/set-property db 123  :org.sidos.test.tasks.task :description "foo"))))

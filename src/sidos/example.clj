@@ -9,5 +9,5 @@
 
    (s-namespace :fi.sirunsivut.project
                 (s-type :task
-                        (s-property :description :string)
+                        (s-property :description :int)
                         (s-property :assigned-to (>> :fi.sirunsivut.person :person))))])

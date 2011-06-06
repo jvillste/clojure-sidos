@@ -1,0 +1,1 @@
+slime-apropos C-c C-d C-a

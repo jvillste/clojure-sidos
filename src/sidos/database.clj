@@ -48,7 +48,7 @@
 
 (defn property-column [property]
   (str (column-name property) " " (sql-type (:range property))))
-§
+
 (defn type-table-definition [type]
   (str "create table " (type-table-name type)
        " ( "
@@ -71,12 +71,17 @@
         (catch Exception exception
           (println "Failed to execute: " sql ))))))
 
-(defn execute-query [db query]
-  (sql/with-connection db
+(defn execute-query [db & query]
+  (sql/with-connection
     (sql/with-query-results rows
-      [query]
-      (println rows)
-      rows)))
+      query
+      (doall rows))))
+
+(defn drop-all [db] (execute-update db "drop all objects"))
+
+(defn show-tables [db]
+  (execute-query db "show tables"))
+
 
 (defn create-tables-for-type [db type]
   (execute-update db
@@ -85,10 +90,6 @@
                                   (filter #(= (:collection-type %) :list)
                                           (:properties type))))))
 
-(defn drop-all [db] (execute-sql db "drop all objects"))
-
-(defn show-tables [db]
-  (execute-query db "show tables"))
-
-
+(defn set-property [db subject-id type property value]
+  (execute-query db "select count(*) from ? where id = ?" (type-table-name type) subject-id))
 
