@@ -61,21 +61,19 @@
   (str "create table list_" (type-table-name domain) "_" (name (:name property))
        " ( subject uuid, value " (sql-type (:range property)) ", index int )"))
 
-
-(defn execute-update [db & sqls]
-  (sql/with-connection db-h2
-    (doseq [sql sqls]
-      (println sql)
-      (try
-        (sql/do-commands sql)
-        (catch Exception exception
-          (println "Failed to execute: " sql ))))))
+(defn execute-updates [db & statements]
+  (sql/with-connection db
+    (doseq [statement statements]
+      (println statement)
+      (sql/do-commands statement))))
 
 (defn execute-query [db & query]
-  (sql/with-connection
-    (sql/with-query-results rows
-      query
-      (doall rows))))
+  (do
+    (println query)
+    (sql/with-connection db
+      (sql/with-query-results rows
+        (into [] query)
+        (doall rows)))))
 
 (defn drop-all [db] (execute-update db "drop all objects"))
 
@@ -84,12 +82,12 @@
 
 
 (defn create-tables-for-type [db type]
-  (execute-update db
-                  (type-table-definition type)
-                  (apply str (map (partial list-table-definition type)
-                                  (filter #(= (:collection-type %) :list)
-                                          (:properties type))))))
+  (execute-updates db
+                   (type-table-definition type)
+                   (apply str (map (partial list-table-definition type)
+                                   (filter #(= (:collection-type %) :list)
+                                           (:properties type))))))
 
-(defn set-property [db subject-id type property value]
-  (execute-query db "select count(*) from ? where id = ?" (type-table-name type) subject-id))
+(defn set-property [db subject-id type namespace property value]
+  (execute-query db (str "select count(*) from " (type-table-name type) " where id = ?") subject-id))
 

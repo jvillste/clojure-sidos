@@ -30,8 +30,9 @@
     (println (sidos.database/show-tables db))))
 
 
-(defn create-tables-for-type-test []
+(defn set-property-test []
   (do
     (sidos.database/drop-all db)
     (sidos.database/create-tables-for-type db (-> model first))
-    (println (sidos.database/set-property db 123  :org.sidos.test.tasks.task :description "foo"))))
+    (sidos.database/set-property db 123 (-> model first) :org.sidos.test.persons :description "foo")))
+

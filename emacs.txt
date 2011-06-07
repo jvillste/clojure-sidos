@@ -1,1 +1,10 @@
-slime-apropos C-c C-d C-a
+slime-apropos eli etsi määrielmiä nimen perusteella
+C-c C-d C-a
+
+näytä repl
+C-c C-z
+
+mene kursorin alla olevan symbolin määritelmään
+M-.
+ja takasin
+M-,
