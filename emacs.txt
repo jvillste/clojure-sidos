@@ -8,3 +8,14 @@ mene kursorin alla olevan symbolin määritelmään
 M-.
 ja takasin
 M-,
+
+lisää sulkeet sexpin ympärille
+C-c w
+
+sexp eteenpäin
+C-M-f
+taakseppäin
+C-M-b
+
+region x clip boardille
+clipboard-kill-ring-save

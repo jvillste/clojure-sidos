@@ -10,13 +10,12 @@
   [(s-namespace :org.sidos.test.persons
                 (s-type :person
                         (s-property :name :string)
-                        (s-property :nick_names :string :list)))
+                        (s-property :nick-names :string :list)))
 
    (s-namespace :org.sidos.test.tasks
                 (s-type :task
                         (s-property :description :string)
                         (s-property :assigned-to (>> :org.sidos.test.persons :person))))])
-
 
 (def model (sidos.model/compile-model model-source))
 
@@ -24,15 +23,26 @@
   (println (sidos.database/property-column (-> model first :properties first))))
 
 (defn create-tables-for-type-test []
-  (do
-    (sidos.database/drop-all db)
-    (sidos.database/create-tables-for-type db (-> model first))
-    (println (sidos.database/show-tables db))))
-
+  (sidos.database/with-connection db
+    (sidos.database/drop-all)
+    (sidos.database/create-tables-for-type (-> model first))
+    (sidos.database/show-tables)))
 
 (defn set-property-test []
-  (do
-    (sidos.database/drop-all db)
-    (sidos.database/create-tables-for-type db (-> model first))
-    (sidos.database/set-property db 123 (-> model first) :org.sidos.test.persons :description "foo")))
+  (sidos.database/with-connection db
+    (sidos.database/drop-all)
+    (sidos.database/create-tables-for-type (-> model first))
+    (let [type-name "org.sidos.test.persons.person"
+          id (sidos.database/create-instance type-name)]
+      (sidos.database/set-property id type-name "name" "foo")
+      (sidos.database/get-property id type-name "name"))))
 
+(sidos.database/define-accessors (first model))
+
+(defn accessor-test []
+  (sidos.database/with-connection db
+    (sidos.database/drop-all)
+    (sidos.database/create-tables-for-type (-> model first))
+    ;; (let [id (create-person)]
+    ;;   (person-get-name id))
+    ))

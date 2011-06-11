@@ -17,7 +17,8 @@
                           :properties (filter-by-definition-type :s-property definitions)}))
 
 
-(defn s-property [& values] (let [result (assoc (zipmap [:name :range :collection-type] values) :definition-type :s-property)]
+(defn s-property [& values] (let [result (assoc (zipmap [:name
+                                                         :range :collection-type] values) :definition-type :s-property)]
                               (if (nil? (:collection-type result))
                                 (assoc result :collection-type :single)
                                 result)))
@@ -41,11 +42,19 @@
 
 ;;--------------- Model compiler
 
-(defn model-to-namespace-type-map [model] (apply hash-map (mapcat #(vector (:name %) (map :name (:types %))) model)))
+(defn model-to-namespace-type-map [model]
+  (apply hash-map
+         (mapcat #(vector (:name %)
+                          (map :name
+                               (:types %)))
+                 model)))
 
-(defn create-context [namespaces-to-types] (apply merge-with hash-set (map #(zipmap (% namespaces-to-types)
-                                                                                    (repeat %))
-                                                                           (keys namespaces-to-types))))
+(defn create-context [namespaces-to-types]
+  (apply merge-with hash-set
+         (map #(zipmap (% namespaces-to-types)
+                       (repeat %))
+              (keys namespaces-to-types))))
+
 (defn compile-model [namespaces]
   (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
     (apply concat (for [namespace namespaces]
@@ -68,7 +77,7 @@
 ;;--------------- Printing
 
 (defn full-name [type-reference]
-  (str (name (:namespace type-reference)) "." (name (:name type-reference))))
+  (str (name (type-reference :namespace)) "." (name (type-reference :name))))
 
 (defn print-type [type]
   (do (println (full-name type))

@@ -4,33 +4,6 @@
   (:require sidos.model)
   (:require clojure.string))
 
-(def db-h2 (db-spec (h2-memory-datasource))) ; creates in-memory instance
-
-(defn crud
-  []
-  (let [table :emp
-        orig-record {:id 1 :name "Bashir" :age 40}
-        updt-record {:id 1 :name "Shabir" :age 50}
-        drop-table  #(sql/do-commands "DROP TABLE emp")
-        retrieve-fn #(sql/with-query-results rows
-                       ["SELECT * FROM emp WHERE id=?" 1]
-                       (first rows))]
-    (sql/with-connection db-h2
-      ;; drop table if pre-exists
-      (try (drop-table)  (catch Exception _)) ; ignore exception
-      ;; create table
-      (sql/do-commands  "CREATE TABLE emp (id INT, name VARCHAR(50), age INT)")
-      ;; insert
-      (sql/insert-values table (keys orig-record) (vals orig-record))
-      ;; retrieve
-      (println (retrieve-fn))
-      ;; update
-      ;;(sql/update-values table ["id=?" 1] updt-record)
-      ;; drop table
-      ;;(drop-table)
-      )))
-
-
 (defn sql-type [{:keys [name namespace]}]
   (if (= namespace :org.sidos.primitive)
     (cond (= name :string) "varchar(50)"
@@ -42,52 +15,92 @@
 
 (defn column-name [property] (name (:name property)))
 
-(defn type-table-name [type] (clojure.string/replace (sidos.model/full-name type)
-                                                     "."
-                                                     "_"))
+(defn model-name-to-sql-name [type-name] (clojure.string/replace type-name
+                                                                  #"(\.|-)"
+                                                                  "_"))
+
+
+(defn type-table-name [type] (model-name-to-sql-name (sidos.model/full-name type)))
+
+
 
 (defn property-column [property]
   (str (column-name property) " " (sql-type (:range property))))
 
 (defn type-table-definition [type]
   (str "create table " (type-table-name type)
-       " ( "
+       " ( id uuid, "
        (apply str (interpose ", " (map property-column
                                        (filter #(= (:collection-type %) :single)
                                                (:properties type)))))
        " ) "))
 
 (defn list-table-definition [domain property]
-  (str "create table list_" (type-table-name domain) "_" (name (:name property))
+  (str "create table list_" (type-table-name domain) "_" (model-name-to-sql-name (name (:name property)))
        " ( subject uuid, value " (sql-type (:range property)) ", index int )"))
 
-(defn execute-updates [db & statements]
-  (sql/with-connection db
-    (doseq [statement statements]
-      (println statement)
-      (sql/do-commands statement))))
+(defn execute-updates [& statements]
+  (doseq [statement statements]
+    (println statement)
+    (sql/do-commands statement)))
 
-(defn execute-query [db & query]
+(defn execute-update [statement & parameters]
+  (do
+    (println (str "\"" statement "\" " [(into [] parameters)]))
+    (sql/do-prepared statement (into [] parameters))))
+
+(defn execute-query [query]
   (do
     (println query)
-    (sql/with-connection db
-      (sql/with-query-results rows
-        (into [] query)
-        (doall rows)))))
+    (sql/with-query-results rows
+      query
+      (doall rows))))
 
-(defn drop-all [db] (execute-update db "drop all objects"))
+(defn drop-all [] (execute-updates "drop all objects"))
 
-(defn show-tables [db]
-  (execute-query db "show tables"))
+(defn show-tables []
+  (execute-query ["show tables"]))
 
-
-(defn create-tables-for-type [db type]
-  (execute-updates db
-                   (type-table-definition type)
+(defn create-tables-for-type [type]
+  (execute-updates (type-table-definition type)
                    (apply str (map (partial list-table-definition type)
                                    (filter #(= (:collection-type %) :list)
                                            (:properties type))))))
 
-(defn set-property [db subject-id type namespace property value]
-  (execute-query db (str "select count(*) from " (type-table-name type) " where id = ?") subject-id))
+(defmacro with-connection [db & body]
+  `(sql/with-connection ~db ~@body))
 
+(defn exists [type-name id]
+  (= 0 (:count (first (execute-query [(str "select count(*) as count from " (model-name-to-sql-name type-name) " where id = ?") id])))))
+
+(defn set-property [ id type-name property value ]
+  (if (exists type-name id)
+    (execute-update (str "insert into " (model-name-to-sql-name type-name) " ( " property ", id) values (?,?)")
+                    value id)
+    (execute-update (str "update " (model-name-to-sql-name type-name) " set " property " = ? where id = ?")
+                    value id)))
+
+(defn get-property [ id type-name property-name ]
+  ((keyword property-name) (first (execute-query [(str "select "
+                                                       property-name
+                                                       " from "
+                                                       (model-name-to-sql-name type-name)
+                                                       " where id = ?")
+                                                  id]))))
+
+(defn create-instance [type-name]
+  (let [id (java.util.UUID/randomUUID)]
+    (execute-update (str "insert into " (model-name-to-sql-name type-name) " (id) values (?)")
+                    id)
+    id))
+
+
+(defmacro define-accessors [type]
+  (let [evaluated-type (eval type)]
+    (cons 'do
+          (cons `(defn ~(symbol (str "create-" (name (:name evaluated-type)))) []
+                   (create-instance ~(sidos.model/full-name evaluated-type)))
+                (map (fn [property]
+                       `(defn ~(symbol (str (name (:name evaluated-type)) "-get-" (name (:name property)))) [id#]
+                          (get-property id# ~(sidos.model/full-name evaluated-type) ~(name (:name property)))))
+                     (:properties evaluated-type))))))

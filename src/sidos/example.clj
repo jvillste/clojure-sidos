@@ -11,3 +11,4 @@
                 (s-type :task
                         (s-property :description :int)
                         (s-property :assigned-to (>> :fi.sirunsivut.person :person))))])
+
