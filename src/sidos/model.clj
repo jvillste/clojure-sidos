@@ -3,31 +3,41 @@
 ;;--------------- Modelling DSL
 
 (defn filter-by-definition-type [type definitions]
-  (filter #(= (:definition-type %1) type) definitions))
+  (filter #(= (:definition-type %) type) definitions))
 
-(defn s-namespace
-  ([name & definitions]  {:definition-type :s-namespace
-                          :name name
-                          :types (filter-by-definition-type :s-type definitions)
-                          :aliases (filter-by-definition-type :s-alias definitions)}))
+(defmacro s-namespace
+  [namespace-name & definitions] `{:definition-type :s-namespace
+                                    :name ~(name namespace-name)
+                                    :types (filter-by-definition-type :s-type [~@definitions] )
+                                    :aliases (filter-by-definition-type :s-alias [~@definitions])})
 
-(defn s-type
-  ([name & definitions]  {:definition-type :s-type
-                          :name name
-                          :properties (filter-by-definition-type :s-property definitions)}))
+(defmacro s-type
+  [type-name & definitions] `{:definition-type :s-type
+                              :name ~(name type-name)
+                              :properties (filter-by-definition-type :s-property [~@definitions])})
 
 
-(defn s-property [& values] (let [result (assoc (zipmap [:name
-                                                         :range :collection-type] values) :definition-type :s-property)]
-                              (if (nil? (:collection-type result))
-                                (assoc result :collection-type :single)
-                                result)))
+(defmacro s-property
+  ([property-name range] `{:name ~(name property-name)
+                           :range ~(name range)
+                           :collection-type :singe
+                           :definition-type :s-property})
 
-(defmacro dsl-keyword [name & keys]
-  `(defn ~name [& values#] (assoc (zipmap [~@keys] values# ) :definition-type ~(keyword name))))
+  ([property-name range collection-type] `{:name ~(name property-name)
+                                           :range ~(name range)
+                                           :collection-type ~(keyword (name collection-type))
+                                           :definition-type :s-property}))
 
-(dsl-keyword s-alias :namespace-name :short-name)
-(dsl-keyword >> :namespace :type)
+
+(defmacro s-alias
+  [namespace-name short-name] `{:namespace-name ~(name namespace-name)
+                                :short-name ~(name short-name)
+                                :definition-type :s-alias})
+
+(defmacro >>
+  [namespace-name type-name] `{:namespacee ~(name namespace-name)
+                               :type ~(name type-name)
+                               :definition-type :>>})
 
 
 ;;--------------- Primitive model

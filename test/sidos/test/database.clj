@@ -37,12 +37,12 @@
       (sidos.database/set-property id type-name "name" "foo")
       (sidos.database/get-property id type-name "name"))))
 
-(sidos.database/define-accessors (first model))
+
 
 (defn accessor-test []
   (sidos.database/with-connection db
     (sidos.database/drop-all)
     (sidos.database/create-tables-for-type (-> model first))
-    ;; (let [id (create-person)]
-    ;;   (person-get-name id))
-    ))
+    (sidos.database/define-accessors model)
+    (let [person (create-person)]
+      (person-get-name person))))

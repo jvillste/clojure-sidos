@@ -16,8 +16,8 @@
 (defn column-name [property] (name (:name property)))
 
 (defn model-name-to-sql-name [type-name] (clojure.string/replace type-name
-                                                                  #"(\.|-)"
-                                                                  "_"))
+                                                                 #"(\.|-)"
+                                                                 "_"))
 
 
 (defn type-table-name [type] (model-name-to-sql-name (sidos.model/full-name type)))
@@ -95,12 +95,14 @@
     id))
 
 
-(defmacro define-accessors [type]
-  (let [evaluated-type (eval type)]
-    (cons 'do
-          (cons `(defn ~(symbol (str "create-" (name (:name evaluated-type)))) []
-                   (create-instance ~(sidos.model/full-name evaluated-type)))
-                (map (fn [property]
-                       `(defn ~(symbol (str (name (:name evaluated-type)) "-get-" (name (:name property)))) [id#]
-                          (get-property id# ~(sidos.model/full-name evaluated-type) ~(name (:name property)))))
-                     (:properties evaluated-type))))))
+(defmacro define-accessors [model]
+  (cons 'do
+        (apply concat (for [type (eval model)]
+                        (cons
+                         `(defn ~(symbol (str "create-" (name (:name type)))) []
+                            (create-instance ~(sidos.model/full-name type)))
+                         (map (fn [property]
+                                `(defn ~(symbol (str "get-" (name (:name type)) "-" (name (:name property))))
+                                   [id#]
+                                   (get-property id# ~(sidos.model/full-name type) ~(name (:name property)))))
+                              (:properties type)))))))
