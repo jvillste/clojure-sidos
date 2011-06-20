@@ -94,15 +94,9 @@
                     id)
     id))
 
-
 (defmacro define-accessors [model]
-  (cons 'do
-        (apply concat (for [type (eval model)]
-                        (cons
-                         `(defn ~(symbol (str "create-" (name (:name type)))) []
-                            (create-instance ~(sidos.model/full-name type)))
-                         (map (fn [property]
-                                `(defn ~(symbol (str "get-" (name (:name type)) "-" (name (:name property))))
-                                   [id#]
-                                   (get-property id# ~(sidos.model/full-name type) ~(name (:name property)))))
-                              (:properties type)))))))
+  (doseq [type  (sidos.model/compile-model model)]
+    (intern *ns* (symbol (str "create-" (name (:name type)))) (fn [] (create-instance (sidos.model/full-name type))))
+    (doseq [property (:properties type)]
+      (intern *ns* (symbol (str "get-" (name (:name type)) "-" (name (:name property))))
+              (fn [id] (get-property id (sidos.model/full-name type) (name (:name property))))))))

@@ -7,9 +7,9 @@
 
 (defmacro s-namespace
   [namespace-name & definitions] `{:definition-type :s-namespace
-                                    :name ~(name namespace-name)
-                                    :types (filter-by-definition-type :s-type [~@definitions] )
-                                    :aliases (filter-by-definition-type :s-alias [~@definitions])})
+                                   :name ~(name namespace-name)
+                                   :types (filter-by-definition-type :s-type [~@definitions] )
+                                   :aliases (filter-by-definition-type :s-alias [~@definitions])})
 
 (defmacro s-type
   [type-name & definitions] `{:definition-type :s-type
@@ -19,12 +19,16 @@
 
 (defmacro s-property
   ([property-name range] `{:name ~(name property-name)
-                           :range ~(name range)
+                           :range ~(if (symbol? range)
+                                     (name range)
+                                     range)
                            :collection-type :singe
                            :definition-type :s-property})
 
   ([property-name range collection-type] `{:name ~(name property-name)
-                                           :range ~(name range)
+                                           :range ~(if (symbol? range)
+                                                     (name range)
+                                                     range)
                                            :collection-type ~(keyword (name collection-type))
                                            :definition-type :s-property}))
 
@@ -35,7 +39,7 @@
                                 :definition-type :s-alias})
 
 (defmacro >>
-  [namespace-name type-name] `{:namespacee ~(name namespace-name)
+  [namespace-name type-name] `{:namespace ~(name namespace-name)
                                :type ~(name type-name)
                                :definition-type :>>})
 
@@ -43,11 +47,11 @@
 ;;--------------- Primitive model
 
 (def org-sidos-primitive
-  (s-namespace :org.sidos.primitive
-               (s-type :string)
-               (s-type :integer)
-               (s-type :time)
-               (s-type :boolean)))
+  (s-namespace org.sidos.primitive
+               (s-type string)
+               (s-type integer)
+               (s-type time)
+               (s-type boolean)))
 
 
 ;;--------------- Model compiler
@@ -59,30 +63,39 @@
                                (:types %)))
                  model)))
 
-(defn create-context [namespaces-to-types]
+(defn get-types-to-namespaces [namespaces-to-types]
+  "namespaces-to-types = {''a'' (''b'') ''c'' (''d'' ''e'')}
+   result: {''d'' ''c'', ''e'' ''c'', ''b'' ''a''}"
   (apply merge-with hash-set
-         (map #(zipmap (% namespaces-to-types)
+         (map #(zipmap (namespaces-to-types %)
                        (repeat %))
-              (keys namespaces-to-types))))
+              (keys namespaces-to-types) )))
+
+(defn compile-property
+  [context property]
+  { :name (:name property)
+   :range (let [range-specification (:range property)]
+            (if (:definition-type range-specification)
+              { :name (:type range-specification)
+               :namespace (:namespace range-specification)}
+              { :name range-specification
+               :namespace (context range-specification)}))
+   :collection-type (:collection-type property)})
+
+(defn compile-type [context namespace type ] { :name (:name type)
+                                              :namespace (:name namespace)
+                                              :properties (map (partial compile-property context)  (:properties type))})
 
 (defn compile-model [namespaces]
   (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
-    (apply concat (for [namespace namespaces]
-                    (let [context (create-context (select-keys namespaces-to-types
-                                                               [(:name namespace) :org.sidos.primitive]))]
-                      (for [type (:types namespace)]
-                        (hash-map :name (:name type)
-                                  :namespace (:name namespace)
-                                  :properties (for [property (:properties type)]
-                                                (hash-map :name (:name property)
-                                                          :range (let [range-specification (:range property)]
-                                                                   (if (:definition-type range-specification)
-                                                                     (hash-map :name (:type range-specification)
-                                                                               :namespace (:namespace range-specification))
-                                                                     (hash-map :name range-specification
-                                                                               :namespace (range-specification context))))
-                                                          :collection-type (:collection-type property))))))))))
+    (for [namespace namespaces]
+      (let [context (get-types-to-namespaces (select-keys namespaces-to-types
+                                                          [(:name namespace) :org.sidos.primitive]))]
 
+        (map (partial compile-type
+                      context
+                      namespace)
+             (:types namespace) )))))
 
 ;;--------------- Printing
 
