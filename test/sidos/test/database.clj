@@ -7,15 +7,15 @@
 (def db (db-spec (h2-memory-datasource)))
 
 (def model-source
-  [(s-namespace :org.sidos.test.persons
-                (s-type :person
-                        (s-property :name :string)
-                        (s-property :nick-names :string :list)))
+  [(s-namespace org.sidos.test.persons
+                (s-type person
+                        (s-property name string)
+                        (s-property nick-names string list)))
 
-   (s-namespace :org.sidos.test.tasks
-                (s-type :task
-                        (s-property :description :string)
-                        (s-property :assigned-to (>> :org.sidos.test.persons :person))))])
+   (s-namespace org.sidos.test.tasks
+                (s-type task
+                        (s-property description string)
+                        (s-property assigned-to (>> org.sidos.test.persons person))))])
 
 (def model (sidos.model/compile-model model-source))
 
@@ -38,11 +38,18 @@
       (sidos.database/get-property id type-name "name"))))
 
 
+(defn single-valued-properties-test []
+  (sidos.database/single-valued-properties (first model)))
+
+(sidos.database/define-api model)
 
 (defn accessor-test []
   (sidos.database/with-connection db
     (sidos.database/drop-all)
-    (sidos.database/create-tables-for-type (-> model first))
-    (sidos.database/define-accessors model)
+    (sidos.database/create-tables-for-model model)
+
     (let [person (create-person)]
-      (person-get-name person))))
+      (set-person-name person "foobart")
+      (get-person-name person))))
+
+

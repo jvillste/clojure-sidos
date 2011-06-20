@@ -15,5 +15,7 @@
 (def model (sidos.model/compile-model namespaces))
 
 
-(;define-accessors model
- )
+(sidos.database/define-api model)
+
+
+(def foobert (create-person)) 

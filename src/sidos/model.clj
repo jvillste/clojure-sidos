@@ -22,7 +22,7 @@
                            :range ~(if (symbol? range)
                                      (name range)
                                      range)
-                           :collection-type :singe
+                           :collection-type :single
                            :definition-type :s-property})
 
   ([property-name range collection-type] `{:name ~(name property-name)
@@ -88,14 +88,14 @@
 
 (defn compile-model [namespaces]
   (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
-    (for [namespace namespaces]
-      (let [context (get-types-to-namespaces (select-keys namespaces-to-types
-                                                          [(:name namespace) :org.sidos.primitive]))]
+    (apply concat (for [namespace namespaces]
+                    (let [context (get-types-to-namespaces (select-keys namespaces-to-types
+                                                                        [(:name namespace) "org.sidos.primitive"]))]
 
-        (map (partial compile-type
-                      context
-                      namespace)
-             (:types namespace) )))))
+                      (map (partial compile-type
+                                    context
+                                    namespace)
+                           (:types namespace) ))))))
 
 ;;--------------- Printing
 

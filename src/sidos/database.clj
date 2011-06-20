@@ -27,12 +27,14 @@
 (defn property-column [property]
   (str (column-name property) " " (sql-type (:range property))))
 
+(defn single-valued-properties [type] (filter #(= (:collection-type %) :single)
+                                               (:properties type)))
+
 (defn type-table-definition [type]
   (str "create table " (type-table-name type)
        " ( id uuid, "
        (apply str (interpose ", " (map property-column
-                                       (filter #(= (:collection-type %) :single)
-                                               (:properties type)))))
+                                       (single-valued-properties type))))
        " ) "))
 
 (defn list-table-definition [domain property]
@@ -60,6 +62,10 @@
 
 (defn show-tables []
   (execute-query ["show tables"]))
+
+
+(defn create-tables-for-model [model]
+  (dorun (map create-tables-for-type model)))
 
 (defn create-tables-for-type [type]
   (execute-updates (type-table-definition type)
@@ -94,9 +100,37 @@
                     id)
     id))
 
-(defmacro define-accessors [model]
-  (doseq [type  (sidos.model/compile-model model)]
-    (intern *ns* (symbol (str "create-" (name (:name type)))) (fn [] (create-instance (sidos.model/full-name type))))
+
+
+(defn create-function-symbol [type] (symbol (str "create-" (:name type))))
+
+(defn define-creator [type]
+  (let [full-name (sidos.model/full-name type)]
+    (intern *ns*
+            (create-function-symbol type)
+            (fn [] (create-instance full-name)))))
+
+(defn get-function-symbol [type property] (symbol (str "get-" (:name type) "-" (:name property))))
+
+(defn define-getter [type property]
+  (let [property-name (:name property)
+        type-full-name (sidos.model/full-name type)]
+    (intern *ns*
+            (get-function-symbol type property)
+            (fn [id] (get-property id type-full-name property-name)))))
+
+(defn set-function-symbol [type property] (symbol (str "set-" (:name type) "-" (:name property))))
+
+(defn define-setter [type property]
+  (let [property-name (:name property)
+        type-full-name (sidos.model/full-name type)]
+    (intern *ns*
+            (set-function-symbol type property)
+            (fn [id value] (set-property id type-full-name property-name value)))))
+
+(defn define-api [model]
+  (doseq [type model]
+    (define-creator type)
     (doseq [property (:properties type)]
-      (intern *ns* (symbol (str "get-" (name (:name type)) "-" (name (:name property))))
-              (fn [id] (get-property id (sidos.model/full-name type) (name (:name property))))))))
+      (define-getter type property)
+      (define-setter type property))))
