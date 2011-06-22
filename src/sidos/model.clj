@@ -7,40 +7,40 @@
 
 (defmacro s-namespace
   [namespace-name & definitions] `{:definition-type :s-namespace
-                                   :name ~(name namespace-name)
+                                   :name ~(keyword (name namespace-name))
                                    :types (filter-by-definition-type :s-type [~@definitions] )
                                    :aliases (filter-by-definition-type :s-alias [~@definitions])})
 
 (defmacro s-type
   [type-name & definitions] `{:definition-type :s-type
-                              :name ~(name type-name)
+                              :name ~(keyword (name type-name))
                               :properties (filter-by-definition-type :s-property [~@definitions])})
 
 
 (defmacro s-property
-  ([property-name range] `{:name ~(name property-name)
+  ([property-name range] `{:name ~(keyword (name property-name))
                            :range ~(if (symbol? range)
-                                     (name range)
+                                     (keyword (name range))
                                      range)
                            :collection-type :single
                            :definition-type :s-property})
 
-  ([property-name range collection-type] `{:name ~(name property-name)
+  ([property-name range collection-type] `{:name ~(keyword (name property-name))
                                            :range ~(if (symbol? range)
-                                                     (name range)
+                                                     (keyword (name range))
                                                      range)
                                            :collection-type ~(keyword (name collection-type))
                                            :definition-type :s-property}))
 
 
 (defmacro s-alias
-  [namespace-name short-name] `{:namespace-name ~(name namespace-name)
-                                :short-name ~(name short-name)
+  [namespace-name short-name] `{:namespace-name ~(keyword (name namespace-name))
+                                :short-name ~(keyword (name short-name))
                                 :definition-type :s-alias})
 
 (defmacro >>
-  [namespace-name type-name] `{:namespace ~(name namespace-name)
-                               :type ~(name type-name)
+  [namespace-name type-name] `{:namespace ~(keyword (name namespace-name))
+                               :type ~(keyword (name type-name))
                                :definition-type :>>})
 
 
@@ -90,7 +90,7 @@
   (let [namespaces-to-types (model-to-namespace-type-map (conj namespaces org-sidos-primitive))]
     (apply concat (for [namespace namespaces]
                     (let [context (get-types-to-namespaces (select-keys namespaces-to-types
-                                                                        [(:name namespace) "org.sidos.primitive"]))]
+                                                                        [(:name namespace) :org.sidos.primitive]))]
 
                       (map (partial compile-type
                                     context

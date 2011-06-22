@@ -63,15 +63,16 @@
 (defn show-tables []
   (execute-query ["show tables"]))
 
-
-(defn create-tables-for-model [model]
-  (dorun (map create-tables-for-type model)))
-
 (defn create-tables-for-type [type]
   (execute-updates (type-table-definition type)
                    (apply str (map (partial list-table-definition type)
                                    (filter #(= (:collection-type %) :list)
                                            (:properties type))))))
+
+(defn create-tables-for-model [model]
+  (dorun (map create-tables-for-type model)))
+
+
 
 (defmacro with-connection [db & body]
   `(sql/with-connection ~db ~@body))
@@ -110,7 +111,7 @@
             (create-function-symbol type)
             (fn [] (create-instance full-name)))))
 
-(defn get-function-symbol [type property] (symbol (str "get-" (:name type) "-" (:name property))))
+(defn get-function-symbol [type property] (symbol (str "get-" (name (:name type)) "-" (name (:name property)))))
 
 (defn define-getter [type property]
   (let [property-name (:name property)
@@ -119,7 +120,7 @@
             (get-function-symbol type property)
             (fn [id] (get-property id type-full-name property-name)))))
 
-(defn set-function-symbol [type property] (symbol (str "set-" (:name type) "-" (:name property))))
+(defn set-function-symbol [type property] (symbol (str "set-" (name (:name type)) "-" (name (:name property)))))
 
 (defn define-setter [type property]
   (let [property-name (:name property)

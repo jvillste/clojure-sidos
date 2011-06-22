@@ -17,5 +17,3 @@
 
 (sidos.database/define-api model)
 
-
-(def foobert (create-person)) 
