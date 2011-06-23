@@ -13,7 +13,7 @@
           :default nil)
     "uuid"))
 
-(defn column-name [property] (name (:name property)))
+(defn column-name [property] (model-name-to-sql-name (name (:name property))))
 
 (defn model-name-to-sql-name [type-name] (clojure.string/replace type-name
                                                                  #"(\.|-)"
@@ -103,7 +103,7 @@
 
 
 
-(defn create-function-symbol [type] (symbol (str "create-" (:name type))))
+(defn create-function-symbol [type] (symbol (str "create-" (name (:name type)))))
 
 (defn define-creator [type]
   (let [full-name (sidos.model/full-name type)]
@@ -123,7 +123,7 @@
 (defn set-function-symbol [type property] (symbol (str "set-" (name (:name type)) "-" (name (:name property)))))
 
 (defn define-setter [type property]
-  (let [property-name (:name property)
+  (let [property-name (name (:name property))
         type-full-name (sidos.model/full-name type)]
     (intern *ns*
             (set-function-symbol type property)

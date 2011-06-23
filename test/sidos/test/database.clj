@@ -25,7 +25,7 @@
 (defn create-tables-for-type-test []
   (sidos.database/with-connection db
     (sidos.database/drop-all)
-    (sidos.database/create-tables-for-type (-> model first))
+    (sidos.database/create-tables-for-type (-> model second))
     (sidos.database/show-tables)))
 
 (defn set-property-test []
@@ -47,7 +47,6 @@
   (sidos.database/with-connection db
     (sidos.database/drop-all)
     (sidos.database/create-tables-for-model model)
-
     (let [person (create-person)]
       (set-person-name person "foobart")
       (get-person-name person))))
