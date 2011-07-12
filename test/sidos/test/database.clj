@@ -51,4 +51,3 @@
       (set-person-name person "foobart")
       (get-person-name person))))
 
-
