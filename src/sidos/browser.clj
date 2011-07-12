@@ -7,6 +7,57 @@
                                         ;(set! *warn-on-reflection* true)
 
 
+;; painting
+
+(defprotocol Painter
+  (rectangle [painter x y width height])
+  (text [painter text x y]))
+
+;; component
+
+(defprotocol Component
+  (handle-input [component input])
+  (draw [component painter]))
+
+(def *components* (atom []))
+
+;; browser
+
+(def *width* 400)
+(def *height* 400)
+
+(def last-frame-time (System/nanoTime))
+
+(defn render [g]
+  (doto g
+    (.setColor (. Color white))
+    (.fillRect 0 0 *width* *height*)
+    (.setColor (. Color blue)))
+  (dorun (map #(draw % g) @*components*))
+
+  (.dispose g))
+
+(def panel (doto (proxy [JPanel] []
+                   (paint [g] (render g)))
+             (.setPreferredSize (new Dimension 200 200))
+             (.addMouseListener
+              mouse-input-handler)
+             (.addMouseMotionListener
+              mouse-input-handler)
+             (.addKeyListener
+              keyboard-input-handler)
+             (.setFocusable true)
+             (.requestFocusInWindow)))
+
+;; Java2D
+
+
+(extend-type Graphics2D
+  Painter
+  (rectangle [graphics2d x y width height]
+    (.fillRect graphics2d x y width height))
+  (text [graphics2d text x y]
+    (.drawString graphics2d text x y)))
 
 ;; input
 
@@ -22,7 +73,11 @@
 (def input-state (agent (new-input-state)))
 
 (defn notify-input-event [new-input-state]
-  (println new-input-state))
+  (swap! *components* (fn [components]
+                        (doall (map #(handle-input % new-input-state)
+                                    components))))
+  (.repaint panel))
+
 
 (defn handle-input [state-changes event]
   (send-off input-state (fn [input-state]
@@ -67,63 +122,6 @@
                                     :key-code (.getKeyCode e)
                                     :key-character (.getKeyChar e)}))))
 
-(definterface Java2DPrimitive
-  (draw [^Graphics2D graphics]))
-
-(definterface Component
-  (update [input])
-  (draw []))
-
-(def *drawables* [])
-(def *width* 400)
-(def *height* 400)
-
-(def last-frame-time (System/nanoTime))
-
-(defn render [g]
-  (doto g
-    (.setColor (. Color white))
-    (.fillRect 0 0 *width* *height*)
-    (.setColor (. Color blue)))
-  (dorun (map #(.draw % g) *drawables*))
-
-  (.dispose g))
-
-(defn update [])
-
-
-
-(def panel (doto (proxy [JPanel] []
-                   (paint [g] (render g)))
-             (.setPreferredSize (new Dimension 200 200))
-             (.addMouseListener
-              mouse-input-handler)
-             (.addMouseMotionListener
-              mouse-input-handler)
-             (.addKeyListener
-              keyboard-input-handler)
-             (.setFocusable true)
-             (.requestFocusInWindow)))
-
-
-;; painting
-
-(defprotocol Painter
-  (rectangle [painter x y width height])
-  (text [painter text x y]))
-
-;; Java2D
-
-
-(def ^Graphics2D *graphics*)
-
-(extend-type Graphics2D
-  Painter
-  (rectangle [graphics2d x y width height]
-    (.fillRect graphics2d x y width height))
-  (text [graphics2d text x y]
-    (.drawText graphics2d text x y)))
-
 
 
 ;; layout
@@ -137,9 +135,7 @@
 
 ;; text box
 
-
-
-(defn draw-text-box [painter text-box]
+(defn draw-text-box [text-box painter]
   (rectangle painter
              (:x text-box)
              (:y text-box)
@@ -150,6 +146,15 @@
         (:text text-box)
         (:x text-box)
         (:y text-box)))
+
+(defrecord TextBox [x y width height text]
+  Component
+  (draw [text-box painter] (draw-text-box text-box painter))
+  (handle-input [text-box input-state]
+    (if (=  (:type (:last-event input-state))
+            :key-pressed)
+      (assoc text-box :text (str (:text text-box) (:key-character (:last-event input-state))))
+      text-box)))
 
 ;; test view
 
@@ -172,33 +177,17 @@
 
   )
 
-;; ship
+(swap! *components* #(conj % (TextBox. 10 10 100 100 "Foo")))
 
-(defn create-random-ship []
-  {:x (rand *width*)
-   :y (rand *height*)
-   :dx (- (rand 1) 0.5)
-   :dy (- (rand 1) 0.5)})
-
-(defn move-coordinate [coordinate delta max margin]
-  (mod (+ coordinate
-          delta)
-       (- max margin)))
-
-(defn move-ship [ship]
-  (-> ship
-      (assoc :x (move-coordinate (:x ship)
-                                 (:dx ship)
-                                 *width*
-                                 10))
-
-      (assoc :y (move-coordinate (:y ship)
-                                 (:dy ship)
-                                 *height*
-                                 10))))
-
-(defn draw-ship [ship])
-
+(def frame (doto (new JFrame)
+             (.add panel)
+             (.addWindowListener
+              (proxy [WindowAdapter] []
+                (windowClosing [e]
+                  (println "Frame closed")
+                  (.dispose frame))))
+             .pack
+             .show))
 
 (comment
 
@@ -218,20 +207,11 @@
     nil)
 
 
-(def frame (doto (new JFrame)
-               (.add panel)
-               (.addWindowListener
-                (proxy [WindowAdapter] []
-                  (windowClosing [e]
-                    (println "Frame closed")
-                    (.dispose frame))))
-               .pack
-               .show))
 
-  (send-off animator animation)
+
+  (send-off ui animation)
+
   (def running false)
 
   )
 
-
-(flush)
