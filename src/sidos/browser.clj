@@ -1,6 +1,6 @@
 (ns org.sidos.browser
   (:import
-   (java.awt Color Dimension Graphics2D)
+   (java.awt Color Dimension Graphics2D RenderingHints Font)
    (java.awt.event KeyListener MouseAdapter KeyAdapter WindowAdapter)
    (javax.swing JFrame JOptionPane JPanel)))
 
@@ -12,6 +12,47 @@
 (defprotocol Painter
   (rectangle [painter x y width height])
   (text [painter text x y]))
+
+;; graphical context
+
+(defprotocol GraphicalContext
+  (text-dimensions [text]))
+
+;; --- graphical elements ---
+
+(defmulti draw (fn [painter element] (class element)))
+(defmulti width (fn [graphical-context element] (class element)))
+(defmulti height (fn [graphical-context element] (class element)))
+(defmulti hit? (fn [graphical-context element x y] (class element)))
+
+;; text element
+
+(defrecord TextElement [text])
+
+(defmethod draw TextElement [painter text-element]
+  (text painter
+        (:text text-element)
+        (:x text-element)
+        (:y text-element)))
+
+(defmethod width TextElement [graphical-context text-element]
+  (:width (text-dimensions graphical-context (:text text-element))))
+
+(defmethod height TextElement [graphical-context text-element]
+  (:height (text-dimensions graphical-context (:text text-element))))
+
+(defmethod hit? TextElement [graphical-context text-element x y]
+  (and (> x (:x text-element))
+       (> y (:y text-element))
+       (< x (+ (:x text-element)
+               (:width text-element)))
+       (< y (+ (:y text-element)
+               (:height text-element)))))
+
+
+;; rectangle element
+
+(defrecord TextElement [text])
 
 ;; component
 
@@ -55,9 +96,21 @@
 (extend-type Graphics2D
   Painter
   (rectangle [graphics2d x y width height]
-    (.fillRect graphics2d x y width height))
+    (.drawRect graphics2d x y width height))
   (text [graphics2d text x y]
-    (.drawString graphics2d text x y)))
+    (.setFont graphics2d (Font. "Arial" Font/PLAIN 12))
+    (.setRenderingHint graphics2d
+                       RenderingHints/KEY_TEXT_ANTIALIASING
+                                        ;RenderingHints/VALUE_TEXT_ANTIALIAS_LCD_HRGB
+                       RenderingHints/VALUE_TEXT_ANTIALIAS_GASP
+                       )
+    (.drawString graphics2d text x y))
+  (text-dimensions [graphics2d text]
+    (let [font-metrics (.getFontMetrics graphics2d (.getFont graphics2d))]
+      (println (.stringWidth font-metrics text))
+      {:width (.stringWidth font-metrics text)
+       :height (.getHeight font-metrics)
+       })))
 
 ;; input
 
@@ -133,19 +186,30 @@
   Layout
   (layout [box-layout element]))
 
+;; label model
+
+(defrecord Label [text])
+
+;; label template
+
+(defn get-label-elements [label]
+  (let [text-element (TextElement. (:text label))]))
+
 ;; text box
 
 (defn draw-text-box [text-box painter]
-  (rectangle painter
-             (:x text-box)
-             (:y text-box)
-             (:width text-box)
-             (:height text-box))
 
-  (text painter
+  (let [dimensions (text-dimensions painter (:text text-box))]
+    (rectangle painter
+               (:x text-box)
+               (:y text-box)
+               (:width dimensions)
+               (:height dimensions))
+
+    (text painter
         (:text text-box)
         (:x text-box)
-        (:y text-box)))
+        (+ (:y text-box) (:height dimensions)))))
 
 (defrecord TextBox [x y width height text]
   Component
@@ -177,7 +241,7 @@
 
   )
 
-(swap! *components* #(conj % (TextBox. 10 10 100 100 "Foo")))
+(swap! *components* #(conj % (TextBox. 40 40 100 100 "Tämä on tälläistä ölinää..")))
 
 (def frame (doto (new JFrame)
              (.add panel)
