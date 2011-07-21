@@ -16,43 +16,70 @@
 ;; graphical context
 
 (defprotocol GraphicalContext
-  (text-dimensions [text]))
+  (text-dimensions [graphical-context text]))
 
 ;; --- graphical elements ---
 
-(defmulti draw (fn [painter element] (class element)))
-(defmulti width (fn [graphical-context element] (class element)))
-(defmulti height (fn [graphical-context element] (class element)))
-(defmulti hit? (fn [graphical-context element x y] (class element)))
+(defprotocol GraphicalElement
+  (draw (fn [graphical-element painter]))
+  (width (fn [graphical-element graphical-context]))
+  (height (fn [graphical-element graphical-context]))
+  (hit? (fn [graphical-element graphical-context x y])))
+
+
+;; rectangle element
+
+(defn rectangle-element-draw [rectangle-element painter]
+  (rectangle painter
+             (:x rectangle-element)
+             (:y rectangle-element)
+             (:width rectangle-element)
+             (:height rectangle-element)))
+
+(defn rectangle-element-width [rectangle-element graphical-context ]
+  (:width rectangle-element))
+
+(defn rectangle-element-height [rectangle-element graphical-context]
+  (:height rectangle-element))
+
+(defn rectangle-element-hit? [rectangle-element graphical-context x y]
+  (and (> x (:x rectangle-element))
+       (> y (:y rectangle-element))
+       (< x (+ (:x rectangle-element)
+               (:width rectangle-element)))
+       (< y (+ (:y rectangle-element)
+               (:height rectangle-element)))))
+
+(defrecord RectangleElement [])
+
+(extend RectangleElement GraphicalElement
+        {:draw rectangle-element-draw
+         :width rectangle-element-width
+         :height rectangle-element-height
+         :hit? rectangle-element-hit? })
 
 ;; text element
 
-(defrecord TextElement [text])
-
-(defmethod draw TextElement [painter text-element]
+(defn text-element-draw [text-element painter]
   (text painter
         (:text text-element)
         (:x text-element)
         (:y text-element)))
 
-(defmethod width TextElement [graphical-context text-element]
+(defn text-element-width [text-element graphical-context ]
   (:width (text-dimensions graphical-context (:text text-element))))
 
-(defmethod height TextElement [graphical-context text-element]
+(defn text-element-height [text-element graphical-context]
   (:height (text-dimensions graphical-context (:text text-element))))
 
-(defmethod hit? TextElement [graphical-context text-element x y]
-  (and (> x (:x text-element))
-       (> y (:y text-element))
-       (< x (+ (:x text-element)
-               (:width text-element)))
-       (< y (+ (:y text-element)
-               (:height text-element)))))
-
-
-;; rectangle element
 
 (defrecord TextElement [text])
+
+(extend TextElement GraphicalElement
+        {:draw text-element-draw
+         :width text-element-width
+         :height text-element-height
+         :hit? rectangle-element-hit? })
 
 ;; component
 
@@ -94,6 +121,7 @@
 
 
 (extend-type Graphics2D
+
   Painter
   (rectangle [graphics2d x y width height]
     (.drawRect graphics2d x y width height))
@@ -105,6 +133,8 @@
                        RenderingHints/VALUE_TEXT_ANTIALIAS_GASP
                        )
     (.drawString graphics2d text x y))
+
+  GraphicalContext
   (text-dimensions [graphics2d text]
     (let [font-metrics (.getFontMetrics graphics2d (.getFont graphics2d))]
       (println (.stringWidth font-metrics text))
@@ -207,9 +237,9 @@
                (:height dimensions))
 
     (text painter
-        (:text text-box)
-        (:x text-box)
-        (+ (:y text-box) (:height dimensions)))))
+          (:text text-box)
+          (:x text-box)
+          (+ (:y text-box) (:height dimensions)))))
 
 (defrecord TextBox [x y width height text]
   Component
