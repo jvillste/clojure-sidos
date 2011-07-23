@@ -6,7 +6,6 @@
 
                                         ;(set! *warn-on-reflection* true)
 
-
 ;; painting
 
 (defprotocol Painter
@@ -18,131 +17,123 @@
 (defprotocol GraphicalContext
   (text-dimensions [graphical-context text]))
 
-;; --- graphical elements ---
+;; layout
 
-(defprotocol GraphicalElement
-  (draw (fn [graphical-element painter]))
-  (width (fn [graphical-element graphical-context]))
-  (height (fn [graphical-element graphical-context]))
-  (hit? (fn [graphical-element graphical-context x y])))
+(defn box-layout-parent [parent child margin]
+  (assoc parent
+     :width (+ (* 2 margin) (:width child))
+     :height (+ (* 2 margin) (:height child))))
 
-
-;; rectangle element
-
-(defn rectangle-element-draw [rectangle-element painter]
-  (rectangle painter
-             (:x rectangle-element)
-             (:y rectangle-element)
-             (:width rectangle-element)
-             (:height rectangle-element)))
-
-(defn rectangle-element-width [rectangle-element graphical-context ]
-  (:width rectangle-element))
-
-(defn rectangle-element-height [rectangle-element graphical-context]
-  (:height rectangle-element))
-
-(defn rectangle-element-hit? [rectangle-element graphical-context x y]
-  (and (> x (:x rectangle-element))
-       (> y (:y rectangle-element))
-       (< x (+ (:x rectangle-element)
-               (:width rectangle-element)))
-       (< y (+ (:y rectangle-element)
-               (:height rectangle-element)))))
-
-(defrecord RectangleElement [])
-
-(extend RectangleElement GraphicalElement
-        {:draw rectangle-element-draw
-         :width rectangle-element-width
-         :height rectangle-element-height
-         :hit? rectangle-element-hit? })
-
-;; text element
-
-(defn text-element-draw [text-element painter]
-  (text painter
-        (:text text-element)
-        (:x text-element)
-        (:y text-element)))
-
-(defn text-element-width [text-element graphical-context ]
-  (:width (text-dimensions graphical-context (:text text-element))))
-
-(defn text-element-height [text-element graphical-context]
-  (:height (text-dimensions graphical-context (:text text-element))))
+(defn box-layout-child [parent child margin]
+  (assoc child
+     :x (+ margin (:x parent))
+     :y (+ margin (:y parent))))
 
 
-(defrecord TextElement [text])
-
-(extend TextElement GraphicalElement
-        {:draw text-element-draw
-         :width text-element-width
-         :height text-element-height
-         :hit? rectangle-element-hit? })
-
-;; component
+;; --- components ---
 
 (defprotocol Component
+  (draw [component painter])
+  (layout [component graphical-context])
   (handle-input [component input])
-  (draw [component painter]))
+  (hit? [component graphical-context x y]))
 
-(def *components* (atom []))
+;; rectangle
 
-;; browser
+(defn rectangle-draw [rectangle painter]
+  (rectangle painter
+             (:x rectangle)
+             (:y rectangle)
+             (:width rectangle)
+             (:height rectangle)))
 
-(def *width* 400)
-(def *height* 400)
+(defn rectangle-layout [rectangle graphical-context]
+  (assoc rectangle
+    :width 0
+    :height 0))
 
-(def last-frame-time (System/nanoTime))
+(defn rectangle-hit? [rectangle graphical-context x y]
+  (and (> x (:x rectangle))
+       (> y (:y rectangle))
+       (< x (+ (:x rectangle)
+               (:width rectangle)))
+       (< y (+ (:y rectangle)
+               (:height rectangle)))))
 
-(defn render [g]
-  (doto g
-    (.setColor (. Color white))
-    (.fillRect 0 0 *width* *height*)
-    (.setColor (. Color blue)))
-  (dorun (map #(draw % g) @*components*))
+(defrecord Rectangle [])
 
-  (.dispose g))
+(extend Rectangle Component
+        {:draw rectangle-draw
+         :layout rectangle-layout
+         :hit? rectangle-hit?
+         :handle-input (fn [])})
 
-(def panel (doto (proxy [JPanel] []
-                   (paint [g] (render g)))
-             (.setPreferredSize (new Dimension 200 200))
-             (.addMouseListener
-              mouse-input-handler)
-             (.addMouseMotionListener
-              mouse-input-handler)
-             (.addKeyListener
-              keyboard-input-handler)
-             (.setFocusable true)
-             (.requestFocusInWindow)))
+;; text
 
-;; Java2D
+(defn text-draw [text painter]
+  (text painter
+        (:text text)
+        (:x text)
+        (:y text)))
 
+(defn text-layout [text graphical-context]
+  (let [dimensions (text-dimensions graphical-context (:text text))]
+    (assoc text
+      :width (:width dimensions)
+      :height (:height dimensions))))
 
-(extend-type Graphics2D
+(defrecord Text [text])
 
-  Painter
-  (rectangle [graphics2d x y width height]
-    (.drawRect graphics2d x y width height))
-  (text [graphics2d text x y]
-    (.setFont graphics2d (Font. "Arial" Font/PLAIN 12))
-    (.setRenderingHint graphics2d
-                       RenderingHints/KEY_TEXT_ANTIALIASING
-                                        ;RenderingHints/VALUE_TEXT_ANTIALIAS_LCD_HRGB
-                       RenderingHints/VALUE_TEXT_ANTIALIAS_GASP
-                       )
-    (.drawString graphics2d text x y))
+(extend Text Component
+        {:draw text-draw
+         :layout text-layout
+         :hit? rectangle-hit?
+         :handle-input (fn [])})
 
-  GraphicalContext
-  (text-dimensions [graphics2d text]
-    (let [font-metrics (.getFontMetrics graphics2d (.getFont graphics2d))]
-      (println (.stringWidth font-metrics text))
-      {:width (.stringWidth font-metrics text)
-       :height (.getHeight font-metrics)
-       })))
+;; text input
+
+(defn layout-text-input [text-input]
+  (let [[new-rectangle-component new-text-component] (box-layout (:rectangle-component text-input)
+                                                                 (:text-component text-input))]
+    (assoc text-input
+      :rectangle-component new-rectangle-component
+      :text-component new-text-component
+      :width (:width new-rectangle-component)
+      :height (:height new-rectangle-component))))
+
+(defn draw-text-input [text-input painter]
+  (draw (:rectangle-component text-input) painter)
+  (draw (:text-component text-input) painter))
+
+(defn create-text-input-children [text-input]
+  (assoc text-input
+    :text-component (Text. (:text text-input))
+    :retangle-component (Rectangle.)))
+
+(defn text-input-handle-input [text-input input-state]
+  (if (=  (:type (:last-event input-state))
+          :key-pressed)
+    (-> text-input
+        (assoc :text (str (:text text-input) (:key-character (:last-event input-state))))
+        (create-text-input-children)
+        (layout-text-input))
+
+    text-input))
+
+(defrecord TextInput [])
+
+(defn new-text-input []
+  (create-text-input-children (TextInput.)))
+
+(extend TextInput Component
+        {:draw draw-text-input
+         :handle-input text-input-handle-input
+         :layout layout-text-input
+         :hit? rectangle-hit?})
 
 ;; input
+
+
 
 (defn new-input-state []
   {:time (System/nanoTime)
@@ -207,61 +198,73 @@
 
 
 
-;; layout
+;; browser
 
-(defprotocol Layout
-  (layout [layout element]))
+(def *components* (atom []))
 
-(defrecord BoxLayout []
-  Layout
-  (layout [box-layout element]))
+(def *width* 400)
+(def *height* 400)
 
-;; label model
+(def last-frame-time (System/nanoTime))
 
-(defrecord Label [text])
+(defn render [g]
+  (doto g
+    (.setColor (. Color white))
+    (.fillRect 0 0 *width* *height*)
+    (.setColor (. Color blue)))
+  (dorun (map #(draw % g) @*components*))
 
-;; label template
+  (.dispose g))
 
-(defn get-label-elements [label]
-  (let [text-element (TextElement. (:text label))]))
+(def panel (doto (proxy [JPanel] []
+                   (paint [g] (render g)))
+             (.setPreferredSize (new Dimension 200 200))
+             (.addMouseListener mouse-input-handler)
+             (.addMouseMotionListener mouse-input-handler)
+             (.addKeyListener keyboard-input-handler)
+             (.setFocusable true)
+             (.requestFocusInWindow)))
 
-;; text box
+;; Java2D
 
-(defn draw-text-box [text-box painter]
 
-  (let [dimensions (text-dimensions painter (:text text-box))]
-    (rectangle painter
-               (:x text-box)
-               (:y text-box)
-               (:width dimensions)
-               (:height dimensions))
+(extend-type Graphics2D
 
-    (text painter
-          (:text text-box)
-          (:x text-box)
-          (+ (:y text-box) (:height dimensions)))))
+  Painter
+  (rectangle [graphics2d x y width height]
+    (.drawRect graphics2d x y width height))
+  (text [graphics2d text x y]
+    (.setFont graphics2d (Font. "Arial" Font/PLAIN 12))
+    (.setRenderingHint graphics2d
+                       RenderingHints/KEY_TEXT_ANTIALIASING
+                                        ;RenderingHints/VALUE_TEXT_ANTIALIAS_LCD_HRGB
+                       RenderingHints/VALUE_TEXT_ANTIALIAS_GASP
+                       )
+    (.drawString graphics2d text x y))
 
-(defrecord TextBox [x y width height text]
-  Component
-  (draw [text-box painter] (draw-text-box text-box painter))
-  (handle-input [text-box input-state]
-    (if (=  (:type (:last-event input-state))
-            :key-pressed)
-      (assoc text-box :text (str (:text text-box) (:key-character (:last-event input-state))))
-      text-box)))
+  GraphicalContext
+  (text-dimensions [graphics2d text]
+    (let [font-metrics (.getFontMetrics graphics2d (.getFont graphics2d))]
+      (println (.stringWidth font-metrics text))
+      {:width (.stringWidth font-metrics text)
+       :height (.getHeight font-metrics)
+       })))
+
+
+
 
 ;; test view
 
 (comment
 
   (box box-1
-       (text-box name))
+       (text-input name))
 
-  (text-box/on-change name [new-value]
-                      (println new-value))
+  (text-input/on-change name [new-value]
+                        (println new-value))
 
 
-  (style text-box
+  (style text-input
          :font-face "Times"
          :font-size 10)
 
@@ -271,7 +274,9 @@
 
   )
 
-(swap! *components* #(conj % (TextBox. 40 40 100 100 "Tämä on tälläistä ölinää..")))
+(swap! *components* #(conj % (assoc (new-text-input)
+                               :x 0
+                               :y 0)))
 
 (def frame (doto (new JFrame)
              (.add panel)
